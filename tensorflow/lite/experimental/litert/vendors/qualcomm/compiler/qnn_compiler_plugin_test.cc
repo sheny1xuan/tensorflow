@@ -30,8 +30,16 @@ static constexpr absl::string_view kOpTpl = "simple_%s_op.tflite";
 // clang-format off
 const auto kSupportedOps =
     testing::Values(
+                    "add",
+                    "div",
                     "mul",
-                    "slice"
+                    "rsqrt",
+                    "slice",
+                    "sub",
+                    "sum",
+                    "tanh",
+                    "reshape",
+                    "batch_matmul"
                     );
 // clang-format on
 
