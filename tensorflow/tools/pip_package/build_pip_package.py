@@ -27,16 +27,22 @@ To not break the TF API, we pretend that it's still part of the it.
 import argparse
 import glob
 import os
+import re
 import shutil
 import subprocess
 import sys
 import tempfile
-
+from auditwheel import main_show
 from tensorflow.tools.pip_package.utils.utils import copy_file
 from tensorflow.tools.pip_package.utils.utils import create_init_files
 from tensorflow.tools.pip_package.utils.utils import is_macos
 from tensorflow.tools.pip_package.utils.utils import is_windows
 from tensorflow.tools.pip_package.utils.utils import replace_inplace
+
+try:
+  from StringIO import StringIO
+except ImportError:
+  from io import StringIO
 
 
 def parse_args() -> argparse.Namespace:
@@ -61,6 +67,9 @@ def parse_args() -> argparse.Namespace:
                       action="append")
   parser.add_argument("--version", help="TF version")
   parser.add_argument("--collab", help="True if collaborator build")
+  parser.add_argument(
+      "--compliance-tag", help="ManyLinux compliance tag", required=False
+  )
   return parser.parse_args()
 
 
@@ -395,6 +404,44 @@ def build_wheel(
   )
 
 
+def audit_wheel(wheel_dir: str, compliance_tag: str) -> None:
+  """Run auditwheel on the wheel.
+
+  Args:
+    wheel_dir: directory where the wheel will be stored
+    compliance_tag: manyLinux compliance tag
+
+  Raises:
+    RuntimeError: if the wheel is not manyLinux compliant.
+  """
+  # Save stdout and check the output later.
+  stringio = StringIO()
+  previous_stdout = sys.stdout
+  sys.stdout = stringio
+
+  auditwheel_parser = argparse.ArgumentParser(
+      description="Cross-distro Python wheels."
+  )
+  sub_parsers = auditwheel_parser.add_subparsers(metavar="command", dest="cmd")
+  main_show.configure_parser(sub_parsers)
+  auditwheel_args = argparse.Namespace(
+      WHEEL_FILE=os.path.join(f"{wheel_dir}", os.listdir(f"{wheel_dir}")[0]),
+      verbose=1,
+  )
+  main_show.execute(args=auditwheel_args, p=auditwheel_parser)
+
+  sys.stdout = previous_stdout
+  auditwheel_output = stringio.getvalue()
+  with open(os.path.join(f"{wheel_dir}", "auditwheel.log"), "w") as log_file:
+    log_file.write(auditwheel_output)
+
+  regex = 'following platform tag: "{}"'.format(compliance_tag)
+  if not re.search(regex, auditwheel_output):
+    raise RuntimeError(
+        "The wheel is not manyLinux compliant:\n%s" % auditwheel_output
+    )
+
+
 if __name__ == "__main__":
   args = parse_args()
   temp_dir = tempfile.TemporaryDirectory(prefix="tensorflow_wheel")
@@ -409,5 +456,7 @@ if __name__ == "__main__":
         args.platform,
         args.collab,
     )
+    if args.compliance_tag:
+      audit_wheel(args.output_name, args.compliance_tag)
   finally:
     temp_dir.cleanup()
