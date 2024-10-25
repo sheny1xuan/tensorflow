@@ -19,6 +19,7 @@ limitations under the License.
 #include <cstdint>
 #include <iterator>
 #include <set>
+#include <stack>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -201,84 +202,6 @@ absl::StatusOr<bool> RemoveMultiOutputFusionsUnusedOutputs(
   return changed;
 }
 
-absl::Status HloDCE::RecursivelyRemoveDeadComputation(
-    HloModule* module, HloComputation* computation,
-    absl::flat_hash_map<HloComputation*, int>& live_call_counts) {
-  std::vector<HloComputation*> to_be_deleted;
-  // First loops all the sub-instructions/sub-computations.
-  for (HloInstruction* instruction : computation->instructions()) {
-    for (HloComputation* subcomp : instruction->called_computations()) {
-      auto iter = live_call_counts.find(subcomp);
-      if (iter == live_call_counts.end()) {
-        return tsl::errors::Internal(
-            "called computation %s not found in live_call_counts table during "
-            "HloDCE",
-            subcomp->name());
-      }
-
-      // Decrements the live call count and sees if there are no more live
-      // calls to this computation.
-      int live_call_count = --iter->second;
-      CHECK_GE(live_call_count, 0);
-      if (live_call_count == 0) {
-        to_be_deleted.push_back(subcomp);
-        live_call_counts.erase(iter);
-      }
-    }
-  }
-  VLOG(1) << "Removing dead computation " << computation->name();
-  // After looping called subcomputations, now safe to delete the computation.
-  TF_RETURN_IF_ERROR(module->RemoveEmbeddedComputation(computation));
-
-  // Only remove the to be deleted subcomputations now after 'computation' has
-  // been removed. Otherwise we might still have pointers to subcomputations
-  // that we want to delete.
-  for (HloComputation* subcomp : to_be_deleted) {
-    TF_RETURN_IF_ERROR(
-        RecursivelyRemoveDeadComputation(module, subcomp, live_call_counts));
-  }
-  return absl::OkStatus();
-}
-
-absl::StatusOr<bool> HloDCE::RecursivelyRemoveDeadComputations(
-    HloModule* module) {
-  // Tracks whether any dead code is eliminated by this pass.
-  bool module_contains_dead_code = false;
-
-  // First, collect the computations that are
-  // referenced by some remaining instruction. We need to record this as a
-  // refcount map rather than a set since we cannot guarantee that control
-  // flow flattening has been done and there may be multiple call sites.
-  absl::flat_hash_map<HloComputation*, int> live_computation_call_count;
-  if (HloComputation* entry_computation = module->entry_computation()) {
-    ++live_computation_call_count[entry_computation];
-  }
-  // Account for all threads' caller when counting a sub computation's live call
-  // count.
-  for (auto* computation : module->MakeComputationPostOrder()) {
-    for (auto* instruction : computation->instructions()) {
-      for (auto* subcomp : instruction->called_computations()) {
-        ++live_computation_call_count[subcomp];
-      }
-    }
-  }
-
-  // Find dead computations.
-  for (auto* computation : module->MakeComputationPostOrder()) {
-    // Finds all "top-level" dead computations not called by any instructions.
-    // contains(comp) = true and live_computation_call_count[comp] = 0 also
-    // implies that the computation is dead, but is nested in other dead
-    // computations. These inner computations are ignored here since they will
-    // be removed recursing through other computations.
-    if (!live_computation_call_count.contains(computation)) {
-      TF_RETURN_IF_ERROR(RecursivelyRemoveDeadComputation(
-          module, computation, live_computation_call_count));
-      module_contains_dead_code = true;
-    }
-  }
-  return module_contains_dead_code;
-}
-
 absl::StatusOr<bool> HloDCE::Run(
     HloModule* module,
     const absl::flat_hash_set<absl::string_view>& execution_threads) {
@@ -287,24 +210,42 @@ absl::StatusOr<bool> HloDCE::Run(
   VLOG(2) << "Before dce:";
   XLA_VLOG_LINES(2, module->ToString());
 
-  // Run DCE on each computation. Use reverse post order so that we cleanup dead
-  // get-tuple-element users of MultiOutput fusions before cleaning up the
-  // fusion computation.
-  auto computations = module->MakeComputationPostOrder(execution_threads);
-  std::reverse(computations.begin(), computations.end());
-  for (auto* computation : computations) {
-    TF_ASSIGN_OR_RETURN(
-        bool changed_for_computation,
-        RunOnComputation(computation, remove_cross_partition_collective_ops_));
-    changed |= changed_for_computation;
+  // Run DCE on each computation. Visit callers before callees so that we
+  // cleanup dead get-tuple-element users of MultiOutput fusions before cleaning
+  // up the fusion computation. If the same callee is referred to by multiple
+  // callers we'll only visit the first caller before visiting the callee, but
+  // that's ok for the use case of fusion computations that should have a unique
+  // calling instruction anyway.
+  absl::flat_hash_set<HloComputation*> to_remove;
+  for (HloComputation* computation : module->computations(execution_threads)) {
+    to_remove.insert(computation);
   }
 
-  // Now DCE HloComputations.  Keep doing passes through the module until no
-  // more computations can be eliminated. The function removes all
-  // subcomputations that can be proved to have no remaining live callers.
-  TF_ASSIGN_OR_RETURN(bool module_contains_dead_code,
-                      RecursivelyRemoveDeadComputations(module));
-  changed |= module_contains_dead_code;
+  std::stack<HloComputation*> agenda;
+  agenda.push(module->entry_computation());
+  to_remove.erase(module->entry_computation());
+  while (!agenda.empty()) {
+    HloComputation* computation = agenda.top();
+    agenda.pop();
+
+    TF_ASSIGN_OR_RETURN(
+        bool computation_changed,
+        RunOnComputation(computation, remove_cross_partition_collective_ops_));
+    changed |= computation_changed;
+
+    for (auto* instruction : computation->instructions()) {
+      for (HloComputation* called_computation :
+           instruction->called_computations()) {
+        if (to_remove.erase(called_computation) > 0) {
+          agenda.push(called_computation);
+        }
+      }
+    }
+  }
+  for (auto computation : to_remove) {
+    TF_RETURN_IF_ERROR(module->RemoveEmbeddedComputation(computation));
+  }
+  changed |= !to_remove.empty();
 
   if (changed) {
     VLOG(2) << "After dce:";
