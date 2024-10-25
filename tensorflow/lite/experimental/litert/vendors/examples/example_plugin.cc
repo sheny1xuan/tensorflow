@@ -116,15 +116,15 @@ LiteRtStatus LiteRtPluginPartitionModel(LiteRtCompilerPlugin compiler_plugin,
   LITERT_ASSIGN_OR_RETURN_STATUS(auto subgraph,
                                  graph_tools::GetSubgraph(model));
   LITERT_ASSIGN_OR_RETURN_STATUS(auto ops,
-                                 graph_tools::GetSubgraphOps(subgraph));
+                                 graph_tools::LiteRtGetSubgraphOps(subgraph));
 
   for (auto op : ops) {
     LiteRtOpCode op_code;
-    LITERT_RETURN_STATUS_IF_NOT_OK(GetOpCode(op, &op_code));
+    LITERT_RETURN_STATUS_IF_NOT_OK(LiteRtGetOpCode(op, &op_code));
     if (op_code != kLiteRtOpCodeTflMul) {
       continue;
     }
-    LITERT_RETURN_STATUS_IF_NOT_OK(PushOp(selected_ops, op));
+    LITERT_RETURN_STATUS_IF_NOT_OK(LiteRtPushOp(selected_ops, op));
   }
   return kLiteRtStatusOk;
 }
@@ -135,13 +135,13 @@ LiteRtStatus CompileSinglePartition(LiteRtParamIndex partition_index,
                                     LiteRtSubgraph subgraph,
                                     LiteRtCompiledResultT& result) {
   LITERT_ASSIGN_OR_RETURN_STATUS(auto ops,
-                                 graph_tools::GetSubgraphOps(subgraph));
+                                 graph_tools::LiteRtGetSubgraphOps(subgraph));
 
   int num_muls_in_partition = 0;
   for (auto op : ops) {
     LiteRtOpCode op_code;
 
-    LITERT_RETURN_STATUS_IF_NOT_OK(GetOpCode(op, &op_code));
+    LITERT_RETURN_STATUS_IF_NOT_OK(LiteRtGetOpCode(op, &op_code));
     if (op_code != kLiteRtOpCodeTflMul) {
       return kLiteRtStatusErrorUnsupported;
     }

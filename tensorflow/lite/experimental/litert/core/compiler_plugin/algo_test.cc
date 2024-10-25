@@ -85,7 +85,8 @@ TEST(TestPartitionsFromFlatList, SimpleMultiOp) {
   auto model = litert::testing::LoadTestFileModel("simple_multi_op.tflite");
 
   ASSERT_RESULT_OK_ASSIGN(auto subgraph, graph_tools::GetSubgraph(model.get()));
-  ASSERT_RESULT_OK_ASSIGN(auto ops, graph_tools::GetSubgraphOps(subgraph));
+  ASSERT_RESULT_OK_ASSIGN(auto ops,
+                          graph_tools::LiteRtGetSubgraphOps(subgraph));
 
   // func.func @main(arg0)
   //   0 = tfl.add arg0, arg0
@@ -156,7 +157,8 @@ TEST(TestSliceSubgraphSimpleMultiOp, OnePartition) {
 
   ASSERT_RESULT_OK_ASSIGN(auto subgraph, graph_tools::GetSubgraph(model.get()));
 
-  ASSERT_RESULT_OK_ASSIGN(auto ops, graph_tools::GetSubgraphOps(subgraph));
+  ASSERT_RESULT_OK_ASSIGN(auto ops,
+                          graph_tools::LiteRtGetSubgraphOps(subgraph));
 
   // func.func @main(arg0)
   //   0 = tfl.add arg0, arg0
@@ -176,7 +178,7 @@ TEST(TestSliceSubgraphSimpleMultiOp, OnePartition) {
   ASSERT_TRUE(HasValidGeneralTopology(subgraph));
 
   ASSERT_RESULT_OK_ASSIGN(auto edited_subgraph_ops,
-                          graph_tools::GetSubgraphOps(subgraph));
+                          graph_tools::LiteRtGetSubgraphOps(subgraph));
 
   ASSERT_EQ(edited_subgraph_ops.size(), 3);
   ASSERT_EQ(edited_subgraph_ops[0]->op_code, kLiteRtOpCodeTflAdd);
@@ -184,7 +186,7 @@ TEST(TestSliceSubgraphSimpleMultiOp, OnePartition) {
   ASSERT_EQ(edited_subgraph_ops[2]->op_code, kLiteRtOpCodeTflAdd);
 
   ASSERT_RESULT_OK_ASSIGN(auto sliced_subgraph_ops,
-                          graph_tools::GetSubgraphOps(sliced_graph));
+                          graph_tools::LiteRtGetSubgraphOps(sliced_graph));
 
   ASSERT_EQ(sliced_subgraph_ops.size(), 2);
   ASSERT_EQ(sliced_subgraph_ops[0]->op_code, kLiteRtOpCodeTflMul);
@@ -202,7 +204,7 @@ TEST(TestSliceSubgraphSimpleMultiOp, OnePartition) {
                                                    edited_subgraph_ops[0]));
 
     ASSERT_RESULT_OK_ASSIGN(auto sliced_subgraph_inputs,
-                            graph_tools::GetSubgraphInputs(sliced_graph));
+                            graph_tools::LiteRtGetSubgraphInputs(sliced_graph));
 
     ASSERT_EQ(sliced_subgraph_inputs.size(), 1);
 
@@ -222,8 +224,9 @@ TEST(TestSliceSubgraphSimpleMultiOp, OnePartition) {
         hal_cal_op_out,
         {{edited_subgraph_ops.back(), 0}, {edited_subgraph_ops.back(), 1}}));
 
-    ASSERT_RESULT_OK_ASSIGN(auto sliced_subgraph_outputs,
-                            graph_tools::GetSubgraphOutputs(sliced_graph));
+    ASSERT_RESULT_OK_ASSIGN(
+        auto sliced_subgraph_outputs,
+        graph_tools::LiteRtGetSubgraphOutputs(sliced_graph));
 
     ASSERT_EQ(sliced_subgraph_outputs.size(), 1);
     ASSERT_TRUE(graph_tools::MatchTensorDefiningOp(
@@ -236,7 +239,8 @@ TEST(TestSliceSubgraphSimpleMultiOp, TwoPartitions) {
   auto model = litert::testing::LoadTestFileModel("simple_multi_op.tflite");
 
   ASSERT_RESULT_OK_ASSIGN(auto subgraph, graph_tools::GetSubgraph(model.get()));
-  ASSERT_RESULT_OK_ASSIGN(auto ops, graph_tools::GetSubgraphOps(subgraph));
+  ASSERT_RESULT_OK_ASSIGN(auto ops,
+                          graph_tools::LiteRtGetSubgraphOps(subgraph));
 
   // func.func @main(arg0)
   //   0 = tfl.add arg0, arg0
@@ -265,7 +269,7 @@ TEST(TestSliceSubgraphSimpleMultiOp, TwoPartitions) {
   ASSERT_TRUE(HasValidGeneralTopology(subgraph));
 
   ASSERT_RESULT_OK_ASSIGN(auto edited_subgraph_ops,
-                          graph_tools::GetSubgraphOps(subgraph));
+                          graph_tools::LiteRtGetSubgraphOps(subgraph));
 
   ASSERT_EQ(edited_subgraph_ops.size(), 3);
   ASSERT_EQ(edited_subgraph_ops[0]->op_code, kLiteRtOpCodeTflCustom);
@@ -274,7 +278,7 @@ TEST(TestSliceSubgraphSimpleMultiOp, TwoPartitions) {
 
   {
     ASSERT_RESULT_OK_ASSIGN(auto sliced_ops,
-                            graph_tools::GetSubgraphOps(sliced_graph_1));
+                            graph_tools::LiteRtGetSubgraphOps(sliced_graph_1));
 
     ASSERT_EQ(sliced_ops.size(), 1);
     ASSERT_EQ(sliced_ops[0]->op_code, kLiteRtOpCodeTflAdd);
@@ -282,7 +286,7 @@ TEST(TestSliceSubgraphSimpleMultiOp, TwoPartitions) {
 
   {
     ASSERT_RESULT_OK_ASSIGN(auto sliced_ops,
-                            graph_tools::GetSubgraphOps(sliced_graph_2));
+                            graph_tools::LiteRtGetSubgraphOps(sliced_graph_2));
 
     ASSERT_EQ(sliced_ops.size(), 2);
     ASSERT_EQ(sliced_ops[0]->op_code, kLiteRtOpCodeTflMul);

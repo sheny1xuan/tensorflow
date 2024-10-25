@@ -206,14 +206,15 @@ TEST_P(AddSimpleTest, TestBuildModelAddSimple) {
   ASSERT_RESULT_OK_ASSIGN(LiteRtSubgraph subgraph,
                           graph_tools::GetSubgraph(model.get()));
   ASSERT_RESULT_OK_ASSIGN(auto subgraph_inputs,
-                          graph_tools::GetSubgraphInputs(subgraph));
+                          graph_tools::LiteRtGetSubgraphInputs(subgraph));
   ASSERT_RESULT_OK_ASSIGN(auto subgraph_outputs,
-                          graph_tools::GetSubgraphOutputs(subgraph));
+                          graph_tools::LiteRtGetSubgraphOutputs(subgraph));
 
   ASSERT_EQ(subgraph_inputs.size(), 1);
   ASSERT_EQ(subgraph_outputs.size(), 1);
 
-  ASSERT_RESULT_OK_ASSIGN(auto ops, graph_tools::GetSubgraphOps(subgraph));
+  ASSERT_RESULT_OK_ASSIGN(auto ops,
+                          graph_tools::LiteRtGetSubgraphOps(subgraph));
   ASSERT_TRUE(graph_tools::ValidateTopology(ops));
 
   ASSERT_EQ(ops.size(), 1);
@@ -254,14 +255,15 @@ TEST_P(AddCstTest, TestBuildModelAddCst) {
   ASSERT_RESULT_OK_ASSIGN(LiteRtSubgraph subgraph,
                           graph_tools::GetSubgraph(model.get()));
   ASSERT_RESULT_OK_ASSIGN(auto subgraph_inputs,
-                          graph_tools::GetSubgraphInputs(subgraph));
+                          graph_tools::LiteRtGetSubgraphInputs(subgraph));
   ASSERT_RESULT_OK_ASSIGN(auto subgraph_outputs,
-                          graph_tools::GetSubgraphOutputs(subgraph));
+                          graph_tools::LiteRtGetSubgraphOutputs(subgraph));
 
   ASSERT_EQ(subgraph_inputs.size(), 1);
   ASSERT_EQ(subgraph_outputs.size(), 1);
 
-  ASSERT_RESULT_OK_ASSIGN(auto ops, graph_tools::GetSubgraphOps(subgraph));
+  ASSERT_RESULT_OK_ASSIGN(auto ops,
+                          graph_tools::LiteRtGetSubgraphOps(subgraph));
   ASSERT_TRUE(graph_tools::ValidateTopology(ops));
 
   ASSERT_EQ(ops.size(), 1);
@@ -303,14 +305,15 @@ TEST_P(SimpleMultiOpTest, TestBuildModelSimpleMultiAdd) {
   ASSERT_RESULT_OK_ASSIGN(LiteRtSubgraph subgraph,
                           graph_tools::GetSubgraph(model.get()));
   ASSERT_RESULT_OK_ASSIGN(auto subgraph_inputs,
-                          graph_tools::GetSubgraphInputs(subgraph));
+                          graph_tools::LiteRtGetSubgraphInputs(subgraph));
   ASSERT_RESULT_OK_ASSIGN(auto subgraph_outputs,
-                          graph_tools::GetSubgraphOutputs(subgraph));
+                          graph_tools::LiteRtGetSubgraphOutputs(subgraph));
 
   ASSERT_EQ(subgraph_inputs.size(), 1);
   ASSERT_EQ(subgraph_outputs.size(), 1);
 
-  ASSERT_RESULT_OK_ASSIGN(auto ops, graph_tools::GetSubgraphOps(subgraph));
+  ASSERT_RESULT_OK_ASSIGN(auto ops,
+                          graph_tools::LiteRtGetSubgraphOps(subgraph));
   ASSERT_TRUE(graph_tools::ValidateTopology(ops));
 
   ASSERT_EQ(ops.size(), 4);

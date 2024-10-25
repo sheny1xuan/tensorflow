@@ -88,10 +88,11 @@ TEST(TestLegalizeTensor, SimpleSupportedTensorSubgraphInput) {
   ASSERT_RESULT_OK_ASSIGN(auto subgraph,
                           ::graph_tools::GetSubgraph(model.get()));
   ASSERT_RESULT_OK_ASSIGN(auto outputs,
-                          ::graph_tools::GetSubgraphOutputs(subgraph));
+                          ::graph_tools::LiteRtGetSubgraphOutputs(subgraph));
 
   auto qnn_tensor = litert::qnn::BuildDefaultTensor();
-  ASSERT_STATUS_OK(litert::qnn::LegalizeTensor(outputs[0], qnn_tensor));
+  auto output = litert::Tensor(outputs[0]);
+  ASSERT_STATUS_OK(litert::qnn::LegalizeTensor(output, qnn_tensor));
 
   ASSERT_EQ(qnn_tensor.version, QNN_TENSOR_VERSION_2);
   EXPECT_EQ(qnn_tensor.v2.dataType, QNN_DATATYPE_FLOAT_32);
@@ -110,11 +111,13 @@ TEST(TestLegalizeTensor, SimpleSupportedTensor) {
 
   ASSERT_RESULT_OK_ASSIGN(auto subgraph,
                           ::graph_tools::GetSubgraph(model.get()));
-  ASSERT_RESULT_OK_ASSIGN(auto ops, ::graph_tools::GetSubgraphOps(subgraph));
+  ASSERT_RESULT_OK_ASSIGN(auto ops,
+                          ::graph_tools::LiteRtGetSubgraphOps(subgraph));
   ASSERT_RESULT_OK_ASSIGN(auto op_outs, ::graph_tools::GetOpOuts(ops[1]));
 
   auto qnn_tensor = litert::qnn::BuildDefaultTensor();
-  ASSERT_STATUS_OK(litert::qnn::LegalizeTensor(op_outs[0], qnn_tensor));
+  auto op_out = litert::Tensor(op_outs[0]);
+  ASSERT_STATUS_OK(litert::qnn::LegalizeTensor(op_out, qnn_tensor));
 
   ASSERT_EQ(qnn_tensor.version, QNN_TENSOR_VERSION_2);
   EXPECT_EQ(qnn_tensor.v2.dataType, QNN_DATATYPE_FLOAT_32);

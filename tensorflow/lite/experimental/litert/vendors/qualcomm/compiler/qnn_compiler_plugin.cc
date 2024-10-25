@@ -162,14 +162,14 @@ LiteRtStatus LiteRtPluginPartitionModel(LiteRtCompilerPlugin compiler_plugin,
   LITERT_ASSIGN_OR_RETURN_STATUS(auto subgraph,
                                  graph_tools::GetSubgraph(model));
   LITERT_ASSIGN_OR_RETURN_STATUS(auto ops,
-                                 graph_tools::GetSubgraphOps(subgraph));
+                                 graph_tools::LiteRtGetSubgraphOps(subgraph));
 
   for (auto op : ops) {
     if (!IsOpSupported(op)) {
       continue;
     }
 
-    LITERT_RETURN_STATUS_IF_NOT_OK(PushOp(selected_ops, op));
+    LITERT_RETURN_STATUS_IF_NOT_OK(LiteRtPushOp(selected_ops, op));
   }
 
   return kLiteRtStatusOk;
